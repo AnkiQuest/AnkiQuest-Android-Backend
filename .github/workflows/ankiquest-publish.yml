@@ -4,8 +4,13 @@ name: AnkiQuest build and publish
 # JAR and the Robolectric JAR, and publishes them to Maven Central as
 # org.ankiquest:anki-backend-{android,core} and
 # org.ankiquest:anki-android-backend-testing, with upstream's publishing setup
-# (vanniktech plugin, signed). Publishing runs only on a version tag or when
-# dispatched with "publish"; never on pull requests.
+# (vanniktech plugin, signed).
+#
+# Releases are automatic: a push to ankiquest (or a manual run) publishes
+# VERSION_NAME from gradle.properties when that version is not released yet
+# (no tag v<version>, not on Maven Central), then tags it. Pull requests only
+# build, and fail when they change published code without a new VERSION_NAME,
+# since a version on Maven Central can never change.
 #
 # Secrets: MAVEN_CENTRAL_USERNAME, MAVEN_CENTRAL_PASSWORD (a Central Portal
 # user token for the org.ankiquest namespace), SIGNING_PRIVATE_KEY and
@@ -18,17 +23,9 @@ name: AnkiQuest build and publish
 # file the user supplies.
 on:
   workflow_dispatch:
-    inputs:
-      publish:
-        description: "Publish to Maven Central"
-        required: false
-        type: boolean
-        default: false
   push:
     branches:
       - ankiquest
-    tags:
-      - "*-ankiquest.*"
   pull_request:
     branches:
       - ankiquest
@@ -41,13 +38,56 @@ env:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel a run on ankiquest: it may be publishing
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
+  # Which version this is, and whether to release it
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+      publish: ${{ steps.read.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - id: read
+        run: |
+          version=$(sed -n 's/^VERSION_NAME=//p' gradle.properties)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          # Pull requests: changing what gets published needs a new version
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            git fetch -q origin "$GITHUB_BASE_REF"
+            before=$(git show "origin/$GITHUB_BASE_REF:gradle.properties" | sed -n 's/^VERSION_NAME=//p')
+            changed=$(git diff --name-only "origin/$GITHUB_BASE_REF...HEAD" -- . ':!*.md' ':!docs/**' ':!.github/**')
+            if [ -n "$changed" ] && [ "$before" = "$version" ]; then
+              echo "::error file=gradle.properties::Published code changed but VERSION_NAME is still $version; raise -ankiquest.N"
+              exit 1
+            fi
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Released already: tagged, or on Maven Central
+          pom="https://repo1.maven.org/maven2/org/ankiquest/anki-backend-android/$version/anki-backend-android-$version.pom"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null || curl -sfI "$pom" > /dev/null; then
+            echo "$version is released already"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$version is new: publishing"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: version
+    permissions:
+      contents: write # for the release tag
     # macOS: the Robolectric JAR carries host libraries for macOS, Linux and
     # Windows, which only the macOS multi-arch build produces
     runs-on: macos-26
@@ -193,9 +233,9 @@ jobs:
             anki/out/node_modules
           key: ${{ steps.rust-cache.outputs.cache-primary-key }}
 
-      # Publishing: on a version tag, or when dispatched with publish set
+      # Publishing: only a version that is not released yet
       - name: Publish core JAR and Android AAR to Maven Central
-        if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/') || inputs.publish)
+        if: needs.version.outputs.publish == 'true'
         env:
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_PRIVATE_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
@@ -205,7 +245,7 @@ jobs:
           ./gradlew rsdroid:publishAllPublicationsToMavenCentral rsdroid-android:publishAllPublicationsToMavenCentral -DtestBuildType=release -Dorg.gradle.daemon=false -Dorg.gradle.console=plain
 
       - name: Publish Robolectric JAR to Maven Central
-        if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/') || inputs.publish)
+        if: needs.version.outputs.publish == 'true'
         env:
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_PRIVATE_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
@@ -216,3 +256,11 @@ jobs:
           export ANKIDROID_MACOS_CC=cc
           export NO_CROSS=true
           ./gradlew rsdroid-testing:publishAllPublicationsToMavenCentral -Dorg.gradle.project.macCC=$ANKIDROID_MACOS_CC -DtestBuildType=debug -Dorg.gradle.daemon=false -Dorg.gradle.console=plain
+
+      - name: Tag the release
+        if: needs.version.outputs.publish == 'true'
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
