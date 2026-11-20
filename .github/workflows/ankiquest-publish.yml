@@ -26,12 +26,12 @@ on:
         default: false
   push:
     branches:
-      - ankiquest
+      - master
     tags:
       - "*-ankiquest.*"
   pull_request:
     branches:
-      - ankiquest
+      - master
 
 env:
   ALL_ARCHS: 1
@@ -139,7 +139,7 @@ jobs:
         timeout-minutes: 5
         with:
           cache-provider: basic
-          cache-read-only: ${{ github.ref != 'refs/heads/ankiquest' }}
+          cache-read-only: ${{ github.ref != 'refs/heads/master' }}
 
       - name: Build all ABIs
         # retries: the build downloads network resources, which may flake
@@ -181,7 +181,7 @@ jobs:
 
       - name: Save Rust cache
         uses: actions/cache/save@v6
-        if: github.ref == 'refs/heads/ankiquest'
+        if: github.ref == 'refs/heads/master'
         with:
           path: |
             ~/.cargo/registry
