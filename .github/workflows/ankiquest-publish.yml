@@ -2,8 +2,8 @@ name: AnkiQuest build and publish
 
 # Builds librsdroid for arm64-v8a, armeabi-v7a, x86_64 and x86, the JVM core
 # JAR and the Robolectric JAR, and publishes them to Maven Central as
-# org.ankiquest:anki-backend-{android,core} and
-# org.ankiquest:anki-android-backend-testing, with upstream's publishing setup
+# org.ankiquest.anki:anki-backend-{android,core} and
+# org.ankiquest.anki:anki-android-backend-testing, with upstream's publishing setup
 # (vanniktech plugin, signed). Publishing runs only on a version tag or when
 # dispatched with "publish"; never on pull requests.
 #
