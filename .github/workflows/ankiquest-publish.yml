@@ -1,0 +1,218 @@
+name: AnkiQuest build and publish
+
+# Builds librsdroid for arm64-v8a, armeabi-v7a, x86_64 and x86, the JVM core
+# JAR and the Robolectric JAR, and publishes them to Maven Central as
+# org.ankiquest:anki-backend-{android,core} and
+# org.ankiquest:anki-android-backend-testing, with upstream's publishing setup
+# (vanniktech plugin, signed). Publishing runs only on a version tag or when
+# dispatched with "publish"; never on pull requests.
+#
+# Secrets: MAVEN_CENTRAL_USERNAME, MAVEN_CENTRAL_PASSWORD (a Central Portal
+# user token for the org.ankiquest namespace), SIGNING_PRIVATE_KEY and
+# SIGNING_PASSWORD (the GPG key that signs the artefacts), as upstream names
+# them.
+#
+# Toolchains are pinned: Rust by rust-toolchain.toml (and the anki
+# submodule's), the NDK by versions.ndk in gradle/libs.versions.toml, the JDK
+# below. The RWKV model weights are not part of the build; the app loads a
+# file the user supplies.
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to Maven Central"
+        required: false
+        type: boolean
+        default: false
+  push:
+    branches:
+      - ankiquest
+    tags:
+      - "*-ankiquest.*"
+  pull_request:
+    branches:
+      - ankiquest
+
+env:
+  ALL_ARCHS: 1
+  RELEASE: 1
+  CARGO_PROFILE_RELEASE_LTO: fat
+  JAVA_VERSION: "21"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # macOS: the Robolectric JAR carries host libraries for macOS, Linux and
+    # Windows, which only the macOS multi-arch build produces
+    runs-on: macos-26
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Fetch submodules
+        run: git submodule update --init
+
+      # The weights have no public licence: fail if any reach the build
+      - name: Check that no model weights are present
+        run: |
+          weights=$( { git ls-files; git -C anki ls-files | sed 's#^#anki/#'; } \
+            | grep -E '\.(bin|pth|pt|safetensors|onnx)$' || true)
+          if [ -n "$weights" ]; then
+            echo "Model weights found:"
+            echo "$weights"
+            exit 1
+          fi
+
+      - name: Install the pinned Rust toolchain
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          (cd anki && rustup show active-toolchain || rustup toolchain install)
+
+      - name: Restore Rust cache
+        id: rust-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            anki/out/rust
+            anki/out/download
+            anki/out/extracted
+            anki/out/node_modules
+          key: ${{ runner.os }}-ankiquest-rust-${{ hashFiles('Cargo.lock', 'anki/Cargo.lock', 'anki/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-ankiquest-rust
+
+      - name: Read the pinned NDK version
+        shell: bash
+        run: |
+          cargo install toml-cli --locked
+          ANDROID_NDK_VERSION=$(toml get gradle/libs.versions.toml versions.ndk --raw)
+          ANDROID_NDK_MAJOR_VERSION=$(echo $ANDROID_NDK_VERSION | cut -f1 -d.)
+          ANDROID_NDK_MINOR_VERSION=$(echo $ANDROID_NDK_VERSION | cut -f2 -d.)
+          ANDROID_NDK_MARKETING_VERSION="r${ANDROID_NDK_MAJOR_VERSION}"
+          if ! [ "$ANDROID_NDK_MINOR_VERSION" == "0" ]; then
+            alphabet="abcdefghijklmnopqrstuvwxyz"
+            ANDROID_NDK_MARKETING_VERSION="${ANDROID_NDK_MARKETING_VERSION}${alphabet:$ANDROID_NDK_MINOR_VERSION:1}"
+          fi
+          echo "ANDROID_NDK_VERSION=$ANDROID_NDK_VERSION" >> $GITHUB_ENV
+          echo "ANDROID_NDK_MARKETING_VERSION=$ANDROID_NDK_MARKETING_VERSION" >> $GITHUB_ENV
+
+      - name: Set up the Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: ${{ env.ANDROID_NDK_MARKETING_VERSION }}
+          add-to-path: false
+          link-to-sdk: true
+
+      - name: Use the pinned NDK only
+        run: |
+          ./.github/scripts/purge_ndk.sh ${ANDROID_NDK_VERSION}
+          export ANDROID_NDK_LATEST_HOME="${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}"
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> $GITHUB_ENV
+          echo "ANDROID_NDK_ROOT=$ANDROID_NDK_LATEST_HOME" >> $GITHUB_ENV
+
+      - name: Configure JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: "temurin"
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Install the Windows and Linux cross compilers
+        run: |
+          brew install --quiet mingw-w64 MaterializeInc/crosstools/x86_64-unknown-linux-gnu
+          x86_64-w64-mingw32-gcc -v
+          x86_64-unknown-linux-gnu-gcc -v
+
+      - name: Set up n2
+        run: ./anki/tools/install-n2
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        timeout-minutes: 5
+        with:
+          cache-provider: basic
+          cache-read-only: ${{ github.ref != 'refs/heads/ankiquest' }}
+
+      - name: Build all ABIs
+        # retries: the build downloads network resources, which may flake
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 90
+          max_attempts: 3
+          retry_wait_seconds: 0
+          retry_on: error
+          command: ./build.sh
+
+      - name: Check the AAR holds all four ABIs
+        run: |
+          aar=$(ls rsdroid-android/build/outputs/aar/*-release.aar | head -n1)
+          for abi in arm64-v8a armeabi-v7a x86_64 x86; do
+            unzip -l "$aar" | grep -q "jni/$abi/librsdroid.so" || { echo "missing $abi in $aar"; exit 1; }
+          done
+
+      - name: Upload backend core JAR
+        uses: actions/upload-artifact@v6
+        with:
+          name: rsdroid-core
+          if-no-files-found: error
+          path: rsdroid/build/libs
+
+      - name: Upload Android AAR
+        uses: actions/upload-artifact@v6
+        with:
+          name: rsdroid-android-aar
+          if-no-files-found: error
+          path: rsdroid-android/build/outputs/aar
+
+      - name: Upload Robolectric JAR
+        uses: actions/upload-artifact@v6
+        with:
+          name: rsdroid-robo
+          if-no-files-found: error
+          path: rsdroid-testing/build/libs
+
+      - name: Save Rust cache
+        uses: actions/cache/save@v6
+        if: github.ref == 'refs/heads/ankiquest'
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            anki/out/rust
+            anki/out/download
+            anki/out/extracted
+            anki/out/node_modules
+          key: ${{ steps.rust-cache.outputs.cache-primary-key }}
+
+      # Publishing: on a version tag, or when dispatched with publish set
+      - name: Publish core JAR and Android AAR to Maven Central
+        if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/') || inputs.publish)
+        env:
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_PRIVATE_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        run: |
+          ./gradlew rsdroid:publishAllPublicationsToMavenCentral rsdroid-android:publishAllPublicationsToMavenCentral -DtestBuildType=release -Dorg.gradle.daemon=false -Dorg.gradle.console=plain
+
+      - name: Publish Robolectric JAR to Maven Central
+        if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/') || inputs.publish)
+        env:
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_PRIVATE_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        run: |
+          export ANKIDROID_LINUX_CC=x86_64-unknown-linux-gnu-gcc
+          export ANKIDROID_MACOS_CC=cc
+          export NO_CROSS=true
+          ./gradlew rsdroid-testing:publishAllPublicationsToMavenCentral -Dorg.gradle.project.macCC=$ANKIDROID_MACOS_CC -DtestBuildType=debug -Dorg.gradle.daemon=false -Dorg.gradle.console=plain
