@@ -38,7 +38,9 @@ jobs:
   determine-macos-runner:
     runs-on: ubuntu-latest
     concurrency:
-      group: runner-determination
+      # AnkiQuest: one group per run. A shared group keeps one pending job and
+      # cancels the rest, which cancelled whole builds whenever two PRs ran.
+      group: runner-determination-${{ github.run_id }}
       cancel-in-progress: false
     outputs:
       runner: ${{ steps.determine-macos-runner.outputs.use-runner }}
