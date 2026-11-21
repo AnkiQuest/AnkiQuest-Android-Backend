@@ -98,8 +98,10 @@ object Shared {
 // Don't throw here - later file accesses will provide a better exception.
 // and the directory exists, even if it's unusable.
                 return dir
+        // Opening a collection also creates folders next to it, such as
+        // rwkv-state-cache/ with the retrievability cache, so delete them too.
         for (f in files) {
-            Assert.assertTrue(f.delete())
+            Assert.assertTrue(f.deleteRecursively())
         }
         return dir
     }
