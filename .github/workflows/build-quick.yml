@@ -303,16 +303,25 @@ jobs:
           if-no-files-found: error
           path: rsdroid-testing/build/libs
 
+      - name: Upload Instrumented Test Results
+        uses: actions/upload-artifact@v6
+        if: ${{ !cancelled() && contains(matrix.os, 'ubuntu') }}
+        with:
+          name: ${{ matrix.name }}-androidTest-results
+          path: |
+            rsdroid-instrumented/build/outputs/androidTest-results
+            rsdroid-instrumented/build/reports/androidTests
+
       - name: Upload Emulator Log
         uses: actions/upload-artifact@v6
-        if: ('!cancelled()' && contains(matrix.os, 'ubuntu'))
+        if: ${{ !cancelled() && contains(matrix.os, 'ubuntu') }}
         with:
           name: ${{ matrix.name }}-adb_logs
           path: adb-log.txt
 
       - name: Upload Emulator Screen Record
         uses: actions/upload-artifact@v6
-        if: ('!cancelled()' && contains(matrix.os, 'ubuntu'))
+        if: ${{ !cancelled() && contains(matrix.os, 'ubuntu') }}
         with:
           name: ${{ matrix.name }}-adb_video
           path: video.webm
