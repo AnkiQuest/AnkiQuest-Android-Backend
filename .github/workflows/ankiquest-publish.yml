@@ -21,14 +21,30 @@ name: AnkiQuest build and publish
 # submodule's), the NDK by versions.ndk in gradle/libs.versions.toml, the JDK
 # below. The RWKV model weights are not part of the build; the app loads a
 # file the user supplies.
+#
+# Docs-only changes skip the run: the build reads no Markdown or licence
+# text, and they cannot raise VERSION_NAME. Plain path filters suffice, since
+# nothing here is a required check or runs in a merge queue.
 on:
   workflow_dispatch:
   push:
     branches:
       - master
+    paths-ignore:
+      - "**.md"
+      - "LICENSE*"
+      - "LICENSES/**"
+      - "docs/**"
+      - ".github/ISSUE_TEMPLATE/**"
   pull_request:
     branches:
       - master
+    paths-ignore:
+      - "**.md"
+      - "LICENSE*"
+      - "LICENSES/**"
+      - "docs/**"
+      - ".github/ISSUE_TEMPLATE/**"
 
 env:
   ALL_ARCHS: 1
@@ -36,9 +52,11 @@ env:
   CARGO_PROFILE_RELEASE_LTO: fat
   JAVA_VERSION: "21"
 
+# Pull requests: a newer push replaces the older run. Every other run may
+# publish, from master or a manual run on any branch: one at a time and never
+# cancelled; a newer one waits, and GitHub drops a superseded waiting one.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  # Never cancel a run on master: it may be publishing
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || 'publish' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
