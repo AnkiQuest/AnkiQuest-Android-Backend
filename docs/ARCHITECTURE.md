@@ -8,10 +8,10 @@ This repo is comprised of three main components:
   of only three different functions: `openBackend()`, `closeBackend()`, and `runMethodRaw()`. When one of these functions is called by
   Java code, `rslib-bridge` takes care of converting the Java objects to a native Rust representation, and then passes the call
   on to Anki's Rust backend, which gets included in `rslib-bridge` via the `anki[/rslib]` submodule.
-- `rsdroid` is a Kotlin/JVM library, published as `anki-backend-core`, that provides a friendly interface to the backend code.
+- `rsdroid` is a Kotlin/JVM library, published as `ankiquest-backend-core`, that provides a friendly interface to the backend code.
   Its JAR targets Java 11. The bulk of its code is automatically generated from the service definitions in `anki/proto/anki`.
   It also exposes the Rust database functionality through `SQLHandler`.
-- `rsdroid-android` is the Android entry point, published as `anki-backend-android`. It is
+- `rsdroid-android` is the Android entry point, published as `ankiquest-backend-android`. It is
   referenced by `Anki-Android`, packages the Android native libraries (`librsdroid.so` for each
   supported architecture), and bundles web assets as Android assets. It exposes `rsdroid` through an `api` dependency.
 
