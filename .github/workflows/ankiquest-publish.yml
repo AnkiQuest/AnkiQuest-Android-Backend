@@ -282,3 +282,14 @@ jobs:
         run: |
           git tag "v$VERSION"
           git push origin "v$VERSION"
+
+      - name: Tell AnkiQuest-Sync the version is published
+        if: needs.version.outputs.publish == 'true'
+        permissions:
+          actions: write
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/AnkiQuest/Sync/dispatches -F event_type=backend-published -f "client_payload[version]=$VERSION"
+          echo "Sent backend-published for $VERSION"
