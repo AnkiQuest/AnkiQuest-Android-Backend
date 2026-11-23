@@ -1,4 +1,7 @@
-# AnkiDroid-Backend
+# AnkiQuest-Android-Backend
+
+AnkiQuest's fork of [ankidroid/Anki-Android-Backend](https://github.com/ankidroid/Anki-Android-Backend);
+everything below is upstream's README.
 
 An interface for accessing Anki Desktop's Rust backend inside AnkiDroid. This
 allows AnkiDroid to re-use the computer version's business logic and webpages,
