@@ -106,6 +106,7 @@ jobs:
     needs: version
     permissions:
       contents: write # for the release tag
+      actions: write # to dispatch to AnkiQuest-Sync
     # macOS: the Robolectric JAR carries host libraries for macOS, Linux and
     # Windows, which only the macOS multi-arch build produces
     runs-on: macos-26
@@ -285,8 +286,6 @@ jobs:
 
       - name: Tell AnkiQuest-Sync the version is published
         if: needs.version.outputs.publish == 'true'
-        permissions:
-          actions: write
         env:
           VERSION: ${{ needs.version.outputs.version }}
           GH_TOKEN: ${{ secrets.FORK_SYNC_TOKEN }}
