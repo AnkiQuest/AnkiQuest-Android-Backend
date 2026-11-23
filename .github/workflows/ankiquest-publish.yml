@@ -289,7 +289,11 @@ jobs:
           actions: write
         env:
           VERSION: ${{ needs.version.outputs.version }}
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.FORK_SYNC_TOKEN }}
         run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::FORK_SYNC_TOKEN is not set; AnkiQuest-Sync must open the pin bump pull request by hand (its own daily run would also find a missed version)."
+            exit 0
+          fi
           gh api repos/AnkiQuest/Sync/dispatches -F event_type=backend-published -f "client_payload[version]=$VERSION"
           echo "Sent backend-published for $VERSION"
