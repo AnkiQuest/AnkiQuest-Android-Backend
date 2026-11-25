@@ -20,6 +20,9 @@ on:
   schedule:
     - cron: '15 10 * * 0'
 
+permissions:
+  contents: read
+
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
@@ -61,7 +64,7 @@ jobs:
     steps:
     # CodeQL runs on Ubuntu which is a little tight on space
     - name: Liberate disk space
-      uses: jlumbroso/free-disk-space@main
+      uses: jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 # v2.0.0
       if: contains(runner.environment, 'github-hosted') && contains(runner.os, 'Linux')
       with:
         tool-cache: false
@@ -73,7 +76,9 @@ jobs:
         swap-storage: false
 
     - name: Checkout repository
-      uses: actions/checkout@v7
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
 
     # Add any setup steps before running the `github/codeql-action/init` action.
     # This includes steps like installing compilers or runtimes (`actions/setup-node`
@@ -83,7 +88,7 @@ jobs:
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v4
+      uses: github/codeql-action/init@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
@@ -127,7 +132,7 @@ jobs:
       shell: bash
 
     - name: Setup Android NDK
-      uses: nttld/setup-ndk@v1
+      uses: nttld/setup-ndk@ed92fe6cadad69be94a966a7ee3271275e62f779 # v1.6.0
       with:
         ndk-version: ${{ env.ANDROID_NDK_MARKETING_VERSION }}
         add-to-path: false
@@ -142,14 +147,14 @@ jobs:
 
     - name: Configure JDK
       if: matrix.build-mode == 'manual'
-      uses: actions/setup-java@v6
+      uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
       with:
         distribution: "temurin"
         java-version: "21" # matches Anki-Android
 
     - name: Restore Rust Cache (Unix)
       if: matrix.build-mode == 'manual'
-      uses: actions/cache/restore@v6
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ~/.cargo/registry
@@ -170,7 +175,7 @@ jobs:
 
     - name: Setup Gradle
       if: matrix.build-mode == 'manual'
-      uses: gradle/actions/setup-gradle@v6
+      uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       timeout-minutes: 5
       with:
         # Use open source provider: https://github.com/gradle/actions/blob/main/docs/setup-gradle.md#basic-caching
@@ -190,6 +195,6 @@ jobs:
         ./gradlew build test -x check
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v4
+      uses: github/codeql-action/analyze@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
       with:
         category: "/language:${{matrix.language}}"
