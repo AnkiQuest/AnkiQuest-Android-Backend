@@ -41,7 +41,7 @@ jobs:
         run: sleep 30
       - name: Use self-hosted runner if online and not busy, otherwise public runner
         id: determine-macos-runner
-        uses: mikehardy/runner-fallback-action@v1
+        uses: mikehardy/runner-fallback-action@dc7732f9e532c451b2527b288ba8d58fd4b0a4ca # v1.1.0
         with:
           organization: "ankidroid"
           # 1- Choices are single labels, emitted array element 0 is used directly below
@@ -69,7 +69,7 @@ jobs:
       matrix: ${{ steps.build-matrix.outputs.result }}
     steps:
       - id: build-matrix
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             // The determine-macos-runner step emits a JSON array of labels, but we need a single label
@@ -94,7 +94,9 @@ jobs:
               "include": includeArray,
             }
       - name: Debug Output
-        run: echo "${{ steps.build-matrix.outputs.result }}"
+        env:
+          MATRIX: ${{ steps.build-matrix.outputs.result }}
+        run: echo "$MATRIX"
 
   # This uses the matrix generated from the matrix-prep stage
   build:
@@ -110,7 +112,7 @@ jobs:
     name: build (${{ matrix.name }})
     steps:
       - name: Liberate disk space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
+        uses: jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 # v2.0.0
         if: contains(matrix.os, 'ubuntu')
         with:
           tool-cache: false
@@ -121,7 +123,9 @@ jobs:
           docker-images: true
           swap-storage: false
 
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install windows pre-requisites
         # Windows requires git and rsync to build correctly, and specifies them from msys2
@@ -160,7 +164,7 @@ jobs:
 
       - name: Restore Rust Cache (Windows)
         id: rust-cache-windows
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: contains(matrix.os, 'windows')
         with:
           path: |
@@ -178,7 +182,7 @@ jobs:
 
       - name: Restore Rust Cache (Unix)
         id: rust-cache-unix
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: contains(matrix.os, 'windows') == false && contains(runner.environment, 'self-hosted') == false
         with:
           path: |
@@ -211,7 +215,7 @@ jobs:
         shell: bash
 
       - name: Setup Android NDK
-        uses: nttld/setup-ndk@v1
+        uses: nttld/setup-ndk@ed92fe6cadad69be94a966a7ee3271275e62f779 # v1.6.0
         with:
           ndk-version: ${{ env.ANDROID_NDK_MARKETING_VERSION }}
           add-to-path: false
@@ -232,7 +236,7 @@ jobs:
           Add-Content -Path $env:GITHUB_ENV -Value ANDROID_NDK_ROOT=$env:ANDROID_NDK_LATEST_HOME
 
       - name: Configure JDK
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: "temurin"
           java-version: "21" # matches Anki-Android
@@ -241,7 +245,7 @@ jobs:
         run: bash ./anki/tools/install-n2
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         timeout-minutes: 5
         with:
           # Use open source provider: https://github.com/gradle/actions/blob/main/docs/setup-gradle.md#basic-caching
@@ -266,7 +270,7 @@ jobs:
         run: ./gradlew test rsdroid-android:lint ktlintCheck --daemon
 
       - name: Run tests (Emulator)
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         if: contains(matrix.os, 'ubuntu')
         timeout-minutes: 30
         with:
@@ -282,7 +286,7 @@ jobs:
             ./gradlew rsdroid-instrumented:connectedCheck
 
       - name: Upload backend core JARs as artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: '!cancelled()'
         with:
           name: rsdroid-core-${{ matrix.os }}
@@ -290,7 +294,7 @@ jobs:
           path: rsdroid/build/libs
 
       - name: Upload Android wrapper AAR as artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: '!cancelled()'
         with:
           name: rsdroid-android-aar-${{ matrix.os }}
@@ -298,7 +302,7 @@ jobs:
           path: rsdroid-android/build/outputs/aar
 
       - name: Upload rsdroid-robo JAR as artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: '!cancelled()'
         with:
           name: rsdroid-robo-${{ matrix.os }}
@@ -306,21 +310,21 @@ jobs:
           path: rsdroid-testing/build/libs
 
       - name: Upload Emulator Log
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: ('!cancelled()' && contains(matrix.os, 'ubuntu'))
         with:
           name: ${{ matrix.name }}-adb_logs
           path: adb-log.txt
 
       - name: Upload Emulator Screen Record
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: ('!cancelled()' && contains(matrix.os, 'ubuntu'))
         with:
           name: ${{ matrix.name }}-adb_video
           path: video.webm
 
       - name: Save Rust Cache (Windows)
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: contains(matrix.os, 'windows') && github.ref == 'refs/heads/main'
         with:
           path: |
@@ -334,7 +338,7 @@ jobs:
           key: ${{ steps.rust-cache-windows.outputs.cache-primary-key }}
 
       - name: Save Rust Cache (Unix)
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: contains(matrix.os, 'windows') == false && github.ref == 'refs/heads/main'
         with:
           path: |
