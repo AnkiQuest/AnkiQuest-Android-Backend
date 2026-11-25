@@ -3,6 +3,14 @@
 AnkiQuest's fork of [ankidroid/Anki-Android-Backend](https://github.com/ankidroid/Anki-Android-Backend);
 everything below is upstream's README.
 
+[![Build](https://github.com/AnkiQuest/AnkiQuest-Android-Backend/actions/workflows/build-quick.yml/badge.svg)](https://github.com/AnkiQuest/AnkiQuest-Android-Backend/actions/workflows/build-quick.yml)
+
+Releases are published to Maven Central as `org.ankiquest:ankiquest-backend-android`,
+`org.ankiquest:ankiquest-backend-core` and `org.ankiquest:ankiquest-android-backend-testing`;
+AnkiQuest-Android consumes them. Issues live in [this repository's
+tracker](https://github.com/AnkiQuest/AnkiQuest-Android-Backend/issues) and binaries in
+[Releases](https://github.com/AnkiQuest/AnkiQuest-Android-Backend/releases).
+
 An interface for accessing Anki Desktop's Rust backend inside AnkiDroid. This
 allows AnkiDroid to re-use the computer version's business logic and webpages,
 instead of having to reimplement them.
@@ -174,7 +182,7 @@ emulator/device (arm64 on M1 Macs), and run unit tests.
 
 Only the current platform is built by default. In CI, the .aar and .jar files
 are built for multiple platforms, so one release library can be used on a variety
-of devices. See [the release workflow](https://github.com/ankidroid/Anki-Android-Backend/blob/main/.github/workflows/build-release.yml) for how this is done.
+of devices. See [the release workflow](https://github.com/AnkiQuest/AnkiQuest-Android-Backend/blob/master/.github/workflows/build-release.yml) for how this is done.
 
 ### Testing with a specific version of anki
 
@@ -217,7 +225,7 @@ the repository.
 1. Head over to the main `Anki-Android` repository and update the
 `AnkiDroid/build.gradle` file there to adopt the new backend version once it
 shows up in
-https://repo1.maven.org/maven2/io/github/david-allison/anki-backend-android/
+https://repo1.maven.org/maven2/org/ankiquest/ankiquest-backend-android/
 
 ## test library copies
 
@@ -243,5 +251,5 @@ See [ARCHITECTURE.md](./docs/ARCHITECTURE.md)
 
 ## License
 
-[GPL-3.0 License](https://github.com/ankidroid/Anki-Android/blob/master/COPYING)  
-[AGPL-3.0 Licence](https://github.com/AnkiDroid/anki/blob/main/LICENSE) (anki submodule)
+[GPL-3.0 License](./LICENSE)  
+[AGPL-3.0 Licence](https://github.com/AnkiQuest/AnkiQuest-Anki/blob/master/LICENSE) (anki submodule)
