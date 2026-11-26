@@ -1,4 +1,8 @@
 [submodule "anki"]
 	path = anki
+<<<<<<< HEAD
 	url = https://github.com/AnkiQuest/AnkiQuest-Anki
 	branch = master
+=======
+	url = https://github.com/Pedrubik2000/kuma3-anki-core.git
+>>>>>>> 51529af2cad1f7d11e4be3c1b78f1ad956d33b03

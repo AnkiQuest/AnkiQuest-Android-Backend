@@ -27,7 +27,10 @@ fn main() -> Result<()> {
 
     build_web_artifacts()?;
     build_android_jni()?;
+<<<<<<< HEAD
     // SKIP_ROBOLECTRIC: no host library for Robolectric (local Android builds)
+=======
+>>>>>>> 51529af2cad1f7d11e4be3c1b78f1ad956d33b03
     if env::var("SKIP_ROBOLECTRIC").is_err() {
         build_robolectric_jni()?;
     }
@@ -50,8 +53,12 @@ fn run_gradle() -> Result<()> {
             Command::new("./gradlew")
         };
         cmd.env("RUNNING_FROM_BUILD_SCRIPT", "1")
+<<<<<<< HEAD
             // assembleRelease covers Android modules; also build the JVM core JAR.
             .args(["assembleRelease", "rsdroid:assemble"]);
+=======
+            .arg("assembleRelease");
+>>>>>>> 51529af2cad1f7d11e4be3c1b78f1ad956d33b03
         if env::var("SKIP_ROBOLECTRIC").is_err() {
             cmd.arg("rsdroid-testing:build");
         }
@@ -196,8 +203,13 @@ fn build_android_jni() -> Result<()> {
     if is_release {
         command.arg("--release");
     }
+<<<<<<< HEAD
     // ANDROID_RUSTFLAGS: extra flags, such as --remap-path-prefix=$HOME=/build
     // to keep the build machine's paths out of the library
+=======
+    // ANDROID_RUSTFLAGS: extra flags, e.g. --remap-path-prefix=$HOME=/build to keep the build
+    // machine's paths out of the library
+>>>>>>> 51529af2cad1f7d11e4be3c1b78f1ad956d33b03
     let mut rustflags = String::from("-C link-args=-Wl,-z,max-page-size=16384");
     if let Ok(extra) = env::var("ANDROID_RUSTFLAGS") {
         rustflags.push(' ');
@@ -221,13 +233,21 @@ fn check_release(force_release_on_windows: bool) -> (bool, &'static str) {
 
 /// Returns target list to pass to cargo ndk
 fn add_android_rust_targets(all_archs: bool) -> Result<&'static [&'static str]> {
+<<<<<<< HEAD
     // ANDROID_ARCH: build one ABI only (sideloading onto one phone)
+=======
+    // ANDROID_ARCH=arm64 builds only aarch64 (for sideloading onto a physical phone), armv7 only 32-bit ARM
+>>>>>>> 51529af2cad1f7d11e4be3c1b78f1ad956d33b03
     if let Ok(arch) = env::var("ANDROID_ARCH") {
         return Ok(match arch.as_str() {
             "arm64" | "arm64-v8a" | "aarch64" => {
                 add_rust_targets(&["aarch64-linux-android"])?;
                 &["-t", "arm64-v8a"]
             }
+<<<<<<< HEAD
+=======
+            // 32-bit ARM, e.g. Google TVs
+>>>>>>> 51529af2cad1f7d11e4be3c1b78f1ad956d33b03
             "armv7" | "armeabi-v7a" => {
                 add_rust_targets(&["armv7-linux-androideabi"])?;
                 &["-t", "armeabi-v7a"]
